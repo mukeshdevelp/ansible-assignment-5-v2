@@ -66,27 +66,27 @@
     
     - name: Create Database
       become: yes
-      ansible.builtin.shell: |
+      shell: |
         sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1 \
         || sudo -u postgres psql -c "CREATE DATABASE {{ db_name }};"
       register: postgres_db_result
 
     - name: Create User
       become: yes
-      ansible.builtin.shell: |
+      shell: |
         sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1 \
         || sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH ENCRYPTED PASSWORD '{{ db_password }}';"
       register: postgres_user_result
 
     - name: Grant privileges on database
       become: yes
-      ansible.builtin.shell: |
+      shell: |
         sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};"
       register: postgres_privileges_result
 
     - name: Change database owner to db_user
       become: yes
-      ansible.builtin.shell: |
+      shell: |
         sudo -u postgres psql -c "ALTER DATABASE {{ db_name }} OWNER TO {{ db_user }};"
       register: postgres_owner_result
   when: ansible_os_family == "Debian"
@@ -102,7 +102,7 @@
     # -------------------------------
     # 1. Add PGDG Repo + GPG Keys
     # ------------------------------
-    - name: Install PGDG repo (PostgreSQL 18, EL-10)
+    - name: Install PGDG repo (PostgreSQL, EL-10)
       become: yes
       shell: |
         sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm
