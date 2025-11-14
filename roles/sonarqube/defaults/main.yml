@@ -20,12 +20,13 @@ sonarqube_download_url: https://binaries.sonarsource.com/Distribution/sonarqube/
 
 
 # postgres user and db creation variables
-pg_username: sonarqube
-pg_password: '12345'
-postgres_db: sonarqube
-postgres_host: localhost
-postgres_superuser: postgres     # postgres is runnning on localhost (same ec2 instance)
+# unused variables, might need for private ec2's
+# postgres_host: localhost
+# postgres_superuser: postgres     # postgres is runnning on localhost (same ec2 instance)
 # postgres config, user, db, password
+db_user: sonarqube_2
+db_password: '12345'
+db_name: sonarqube_2
+
 postgresql_version: "18"
 
-postgresql_port: 5432
