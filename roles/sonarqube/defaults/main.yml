@@ -1,0 +1,31 @@
+---
+# defaults file for sonarqube
+# sonarqube vsersion, user, group, port is defined here
+sonarqube_version: "25.9.0.112764"
+sonarqube_user: sonar
+sonarqube_group: sonar
+sonarqube_port: 9000
+
+# java packages based on os family
+java_package:
+  ubuntu: openjdk-21-jdk
+  centos: java-21-openjdk-devel
+  debian: openjdk-21-jdk
+
+
+
+
+# binaries link is currnetly not working
+sonarqube_download_url: https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip
+
+
+# postgres user and db creation variables
+pg_username: sonarqube
+pg_password: '12345'
+postgres_db: sonarqube
+postgres_host: localhost
+postgres_superuser: postgres     # postgres is runnning on localhost (same ec2 instance)
+# postgres config, user, db, password
+postgresql_version: "18"
+
+postgresql_port: 5432

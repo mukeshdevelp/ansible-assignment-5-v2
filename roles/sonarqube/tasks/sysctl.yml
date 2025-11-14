@@ -1,0 +1,14 @@
+---
+- name: Set vm.max_map_count
+  sysctl:
+    name: vm.max_map_count
+    value: '262144'
+    state: present
+    reload: yes
+
+- name: Set fs.file-max
+  sysctl:
+    name: fs.file-max
+    value: '131072'
+    state: present
+    reload: yes

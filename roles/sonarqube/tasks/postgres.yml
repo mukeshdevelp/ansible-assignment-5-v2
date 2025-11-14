@@ -1,0 +1,107 @@
+---
+# updaye caches
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+  when: ansible_os_family == "Debian"
+# install postgresql common for pgdg setup script
+- name: Install postgresql-common
+  apt:
+    name: postgresql-common
+    state: present
+  when: ansible_os_family == "Debian"
+# run the pgscript available in /usr/share/postgresql-common/pgdg with yes so that it can run
+- name: Run PGDG setup script
+  shell: 
+    cmd: yes | /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+    creates: /etc/apt/sources.list.d/pgdg.list
+  when: ansible_os_family == "Debian"
+# update apt caches after pgdg script
+- name: Update apt cache after PGDG script
+  apt:
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+- name: Install PostgreSQL and contrib
+  apt:
+    name:
+      - postgresql-{{ postgresql_version }}
+      
+    state: present
+
+  when: ansible_os_family == "Debian"
+  
+# postgres installation
+- name: Install PostgreSQL
+  #The package module is a unified interface. Ansible automatically picks the correct tool based on the OS.
+  # redhat postgresql installation
+  package:
+    name:
+      - postgresql-{{ postgresql_version }}
+      
+    state: present
+  when: ansible_os_family == "RedHat"
+# postgres installatio on debian based system
+
+- name: Install PostgreSQL (Ubuntu)
+  apt:
+    
+    name: 
+      - postgresql-{{ postgresql_version }}
+      
+    state: present
+    update_cache: yes
+  register: postgres_installation_result
+  when: ansible_os_family == "Debian"
+
+# cheking if postgres is installed
+- name: check if postgres is installed
+  debug:
+    msg: "PostgreSQL installed Successfully"
+  when: postgres_installation_result.changed or postgres_installation_result.failed == false
+
+
+# check if postgresql is initiated and enabled
+- name: Ensure PostgreSQL is initialized and running
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
+#-------------------------working code above this line-----------------------------
+- name: Create Database
+  become: yes
+  ansible.builtin.shell: |
+    sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='mydb'" | grep -q 1 \
+    || sudo -u postgres psql -c "CREATE DATABASE mydb;"
+  register:
+    - postgres_db_result
+
+- name: Create User
+  become: yes
+  ansible.builtin.shell: |
+    sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='myuser'" | grep -q 1 \
+    || sudo -u postgres psql -c "CREATE USER myuser WITH PASSWORD 'mypassword';"
+  register:
+    - postgres_user_result
+
+- name: Grant privileges on database
+  become: yes
+  ansible.builtin.shell: |
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE mydb TO myuser;"
+  register:
+    - postgres_privileges_result
+
+# =====================================
+# 7. Debug results
+# =====================================
+- name: Show user creation result
+  debug:
+    var: postgres_user_result.stdout_lines
+
+- name: Show database creation result
+  debug:
+    var: postgres_db_result.stdout_lines
+
+- name: Show privileges result
+  debug:
+    var: postgres_privileges_result.stdout_lines

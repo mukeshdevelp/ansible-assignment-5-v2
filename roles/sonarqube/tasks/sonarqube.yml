@@ -1,0 +1,172 @@
+---
+# tasks file for sonarqube
+
+# 1. Create group
+- name: Create Sonarqube Group
+  group:
+    name: "{{ sonarqube_group }}"
+    state: present
+
+# 2. Create user
+- name: Create SonarQube user
+  user:
+    name: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    shell: /bin/bash
+    create_home: yes
+  register: sonar_user_status
+# 3. Sonarqube user creation validation
+- name: Notify if SonarQube user was created
+  debug:
+    msg: "SonarQube user '{{ sonarqube_user }}' was created."
+  when: sonar_user_status.changed
+
+- name: Notify if SonarQube user already existed
+  debug:
+    msg: "SonarQube user '{{ sonarqube_user }}' already exists."
+  when: not sonar_user_status.changed
+
+
+
+# 3. Install unzip
+- name: Install dependencies for unarchive
+  package:
+    name: unzip
+    state: present
+  when: ansible_os_family in ['Debian', 'RedHat']
+
+# 4. Download SonarQube ZIP archive
+- name: Download SonarQube
+  get_url:
+    url: "{{ sonarqube_download_url }}"
+    dest: "/tmp/sonarqube.zip"
+
+# 5. Create directories
+- name: Create SonarQube and temp directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    mode: '0755'
+  loop:
+    - /opt/sonarqube
+    - /tmp/sonarqube_unzip
+
+# 6. Unzip to temp
+- name: Unzip SonarQube to temp directory
+  unarchive:
+    src: "/tmp/sonarqube.zip"
+    dest: /tmp/sonarqube_unzip
+    remote_src: true
+
+# 7. Find extracted top-level folder
+- name: Find top-level folder name
+  ansible.builtin.find:
+    paths: /tmp/sonarqube_unzip
+    file_type: directory
+    depth: 1
+  register: top_level_folder
+
+
+
+
+# 11. Move contents from extracted folder
+- name: Move SonarQube files into /opt/sonarqube
+  shell: mv {{ item.path }}/* /opt/sonarqube/
+  args:
+    creates: /opt/sonarqube/bin
+  loop: "{{ top_level_folder.files }}"
+  when: top_level_folder.matched == 1
+
+# 12. Remove temp unzip dir
+- name: Clean up temporary unzip directory
+  file:
+    path: /tmp/sonarqube_unzip
+    state: absent
+
+# 13. Fix permissions of everything under /opt/sonarqube
+- name: Ensure sonarqube user owns all files
+  file:
+    path: /opt/sonarqube
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    recurse: yes
+  become: true
+
+# 14. Copy SonarQube service file
+- name: Copy SonarQube service file
+  copy:
+    src: sonarqube.service
+    dest: /etc/systemd/system/sonarqube.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - enable sonarqube
+
+# 15. Configure sonar.properties
+- name: Configure SonarQube
+  template:
+    src: sonar.properties.j2
+    dest: /opt/sonarqube/conf/sonar.properties
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    mode: '0644'
+  notify: restart sonarqube
+
+# 15. Open firewall ports (RedHat)
+- name: Open SonarQube port in firewalld (RedHat)
+  firewalld:
+    port: "{{ sonarqube_port }}/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+
+# 16. Allow port on UFW (Debian)
+- name: Ensure UFW installed (Debian)
+  apt:
+    name: ufw
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Allow SonarQube port (Debian)
+  community.general.ufw:
+    rule: allow
+    port: "{{ sonarqube_port }}"
+    proto: tcp
+  when: ansible_os_family == "Debian"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+  when: ansible_os_family == "Debian"
+
+# 17. Remove stale PID + temp
+- name: Remove stale PID and temp directory
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /opt/sonarqube/bin/linux-x86-64/SonarQube.pid
+    - /opt/sonarqube/temp
+  
+  become_user: "{{ sonarqube_user }}"
+
+# 18. Start SonarQube as correct user
+- name: Start SonarQube
+  shell: "./sonar.sh start"
+  args:
+    chdir: /opt/sonarqube/bin/linux-x86-64
+  become: true
+  become_user: "{{ sonarqube_user }}"
+  environment:
+    SONARQUBE_HOME: "/opt/sonarqube"
+
+- name: Ensure SonarQube.pid is owned by sonarqube user
+  file:
+    path: /opt/sonarqube/bin/linux-x86-64/SonarQube.pid
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+  when: ansible_facts['distribution'] != 'Unknown'
+  become: true

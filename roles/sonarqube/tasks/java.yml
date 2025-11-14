@@ -1,0 +1,27 @@
+---
+- name: Update package cache on Debian/Ubuntu
+  apt:
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Update package cache on RedHat/CentOS/RHEL
+  yum:
+    update_cache: yes
+  when: ansible_os_family == "RedHat"
+  
+- name: Install Java
+  package:
+    name: "{{ java_pkg }}"
+    state: present
+
+- name: Get Java version
+  command: java -version
+  register: java_version_output
+  changed_when: false
+  ignore_errors: true
+
+- name: Show Java version
+  debug:
+    msg: |
+      Java version on {{ inventory_hostname }}:
+      {{ java_version_output.stderr_lines | default(java_version_output.stdout_lines) }}

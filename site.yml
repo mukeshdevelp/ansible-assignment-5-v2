@@ -1,0 +1,7 @@
+- hosts: web
+  # export ANSIBLE_HOST_KEY_CHECKING=False
+  gather_facts: true
+  become: true
+  # main file
+  roles:
+    - sonarqube
