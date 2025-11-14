@@ -24,9 +24,9 @@ sonarqube_download_url: https://binaries.sonarsource.com/Distribution/sonarqube/
 # postgres_host: localhost
 # postgres_superuser: postgres     # postgres is runnning on localhost (same ec2 instance)
 # postgres config, user, db, password
-db_user: sonarqube_2
+db_user: sonarqube_3
 db_password: '12345'
-db_name: sonarqube_2
+db_name: sonarqube_3
 
 postgresql_version: "18"
 
