@@ -6,19 +6,26 @@ sonarqube_user: sonar
 sonarqube_group: sonar
 sonarqube_port: 9000
 
+# java version definitions
+java_version: "21"
 # java packages based on os family
 java_package:
-  ubuntu: openjdk-21-jdk
-  centos: java-21-openjdk-devel
-  debian: openjdk-21-jdk
+  Debian: openjdk-{{ java_version }}-jdk
+  #centos: openjdk-21-jdk # removed centos as it is a rhel based system
+  RedHat: java-{{ java_version }}-openjdk
+java_pkg: "{{ java_package[ansible_os_family]}}"
+sudo_group: "{{ 'wheel' if ansible_os_family == 'RedHat' else 'sudo' }}"
 
 
-
-
-# binaries link is currnetly not working
+sonarqube_java_home_debian: /usr/lib/jvm/java-{{ java_version}}-openjdk-amd64"
+sonarqube_java_home_redhat: /usr/lib/jvm/java-{{ java_version}}-openjdk"
+sonarqube_install_dir: /opt/sonarqube
+# https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-25.8.0.112029.zip
 sonarqube_download_url: https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip
-
-
+# terminal password for sonarqube user
+sonarqube_user_password: '12345'
+# password hash for sonarqube user
+sonarqube_password_hash: "$6$C0M5VJ9U$0Wk5xQ7v1kR9fL8sQzPqVnF1h8TnP2LwZqF5HhK1J8sQ2R7P0B6Y"  
 # postgres user and db creation variables
 # unused variables, might need for private ec2's
 # postgres_host: localhost
@@ -27,6 +34,6 @@ sonarqube_download_url: https://binaries.sonarsource.com/Distribution/sonarqube/
 db_user: sonarqube_3
 db_password: '12345'
 db_name: sonarqube_3
-
+db_port: 5432
 postgresql_version: "18"
 

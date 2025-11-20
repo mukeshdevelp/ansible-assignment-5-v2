@@ -91,7 +91,10 @@
       register: postgres_owner_result
   when: ansible_os_family == "Debian"
     #-------------------------working code above this line-----------------------------
-# redhat server
+
+
+# redhat server-----------------------------
+# service file locattion: /usr/lib/systemd/system/postgresql-18.service
 - name: Install PostgreSQL on RedHat based systems
   block:  
     - name: Update dnf cache

@@ -12,9 +12,19 @@
   user:
     name: "{{ sonarqube_user }}"
     group: "{{ sonarqube_group }}"
+    groups: "{{ sudo_group }}"
+    append: yes
     shell: /bin/bash
     create_home: yes
+    home: "{{ sonarqube_install_dir }}"
+    password: "{{ sonarqube_password_hash }}"
   register: sonar_user_status
+
+- name: Optionally allow SonarQube user passwordless sudo
+  copy:
+    dest: /etc/sudoers.d/sonarqube
+    content: "{{ sonarqube_user }} ALL=(ALL) NOPASSWD:ALL"
+    mode: '0440'
 # 3. Sonarqube user creation validation
 - name: Notify if SonarQube user was created
   debug:
@@ -96,14 +106,24 @@
 
 # 14. Copy SonarQube service file
 - name: Copy SonarQube service file
-  copy:
-    src: sonarqube.service
+  template:
+    src: sonarqube_rh.service.j2
     dest: /etc/systemd/system/sonarqube.service
     mode: '0644'
   notify:
     - reload systemd
     - enable sonarqube
-
+  when: ansible_os_family == "RedHat"
+# 14. Copy SonarQube service file
+- name: Copy SonarQube service file debian
+  template:
+    src: sonarqube_db.service.j2
+    dest: /etc/systemd/system/sonarqube.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - enable sonarqube
+  when: ansible_os_family == "Debian"
 # 15. Configure sonar.properties
 - name: Configure SonarQube
   template:
@@ -115,13 +135,25 @@
   notify: restart sonarqube
 
 # 15. Open firewall ports (RedHat)
-- name: Open SonarQube port in firewalld (RedHat)
+- name: Ensure firewalld is installed
+  yum:
+    name: firewalld
+    state: present
+
+- name: Ensure firewalld is running and enabled
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+
+- name: Open SonarQube port in firewalld
   firewalld:
     port: "{{ sonarqube_port }}/tcp"
     permanent: yes
     state: enabled
     immediate: yes
   when: ansible_os_family == "RedHat"
+
 
 # 16. Allow port on UFW (Debian)
 - name: Ensure UFW installed (Debian)
@@ -144,6 +176,7 @@
 
 # 17. Remove stale PID + temp
 - name: Remove stale PID and temp directory
+  
   file:
     path: "{{ item }}"
     state: absent
@@ -151,22 +184,6 @@
     - /opt/sonarqube/bin/linux-x86-64/SonarQube.pid
     - /opt/sonarqube/temp
   
-  become_user: "{{ sonarqube_user }}"
+  
 
-# 18. Start SonarQube as correct user
-- name: Start SonarQube
-  shell: "./sonar.sh start"
-  args:
-    chdir: /opt/sonarqube/bin/linux-x86-64
-  become: true
-  become_user: "{{ sonarqube_user }}"
-  environment:
-    SONARQUBE_HOME: "/opt/sonarqube"
 
-- name: Ensure SonarQube.pid is owned by sonarqube user
-  file:
-    path: /opt/sonarqube/bin/linux-x86-64/SonarQube.pid
-    owner: "{{ sonarqube_user }}"
-    group: "{{ sonarqube_group }}"
-  when: ansible_facts['distribution'] != 'Unknown'
-  become: true

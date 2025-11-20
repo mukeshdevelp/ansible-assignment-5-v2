@@ -1,0 +1,28 @@
+[Unit]
+Description=SonarQube service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=forking
+Environment="JAVA_HOME={{ sonarqube_java_home_debian }}"
+# User and group that run SonarQube
+User={{ sonarqube_user }}
+Group={{ sonarqube_group }}
+
+# SonarQube directories
+ExecStart={{ sonarqube_install_dir }}/bin/linux-x86-64/sonar.sh start
+ExecStop={{ sonarqube_install_dir }}/bin/linux-x86-64/sonar.sh stop
+ExecReload={{ sonarqube_install_dir }}/bin/linux-x86-64/sonar.sh restart
+
+# Specify the PID file location for systemd
+PIDFile={{ sonarqube_install_dir }}/bin/linux-x86-64/./SonarQube.pid
+
+# Make systemd restart SonarQube on failure
+Restart=on-failure
+LimitNOFILE=65536
+LimitNPROC=4096
+TimeoutSec=300
+
+[Install]
+WantedBy=multi-user.target

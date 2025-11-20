@@ -2,7 +2,7 @@
 - name: Set vm.max_map_count
   sysctl:
     name: vm.max_map_count
-    value: '262144'
+    value: '524288'
     state: present
     reload: yes
 

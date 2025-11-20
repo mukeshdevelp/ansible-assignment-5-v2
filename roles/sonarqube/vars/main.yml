@@ -1,6 +1,6 @@
 ---
 # vars file for sonarqube
 # Platform-specific variables
-java_pkg: "{{ java_package[ansible_os_family | lower] }}"
+
 postgresql_version: "18"
 

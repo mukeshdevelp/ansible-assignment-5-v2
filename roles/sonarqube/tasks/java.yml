@@ -1,14 +1,16 @@
 ---
+# update caches for ubuntu and debian based systems
 - name: Update package cache on Debian/Ubuntu
   apt:
     update_cache: yes
   when: ansible_os_family == "Debian"
-
+# update caches for redhat based systems
 - name: Update package cache on RedHat/CentOS/RHEL
   yum:
     update_cache: yes
   when: ansible_os_family == "RedHat"
   
+# install java package based on os family independently
 - name: Install Java
   package:
     name: "{{ java_pkg }}"
