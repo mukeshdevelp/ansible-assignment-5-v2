@@ -20,7 +20,7 @@
     password: "{{ sonarqube_password_hash }}"
   register: sonar_user_status
 
-- name: Optionally allow SonarQube user passwordless sudo
+- name: allow SonarQube user passwordless sudo
   copy:
     dest: /etc/sudoers.d/sonarqube
     content: "{{ sonarqube_user }} ALL=(ALL) NOPASSWD:ALL"
@@ -50,7 +50,7 @@
   get_url:
     url: "{{ sonarqube_download_url }}"
     dest: "/tmp/sonarqube.zip"
-
+  when: ansible_os_family in ['Debian', 'RedHat']
 # 5. Create directories
 - name: Create SonarQube and temp directories
   file:
@@ -62,14 +62,14 @@
   loop:
     - /opt/sonarqube
     - /tmp/sonarqube_unzip
-
+  when: ansible_os_family in ['Debian', 'RedHat']
 # 6. Unzip to temp
 - name: Unzip SonarQube to temp directory
   unarchive:
     src: "/tmp/sonarqube.zip"
     dest: /tmp/sonarqube_unzip
     remote_src: true
-
+  when: ansible_os_family in ['Debian', 'RedHat']
 # 7. Find extracted top-level folder
 - name: Find top-level folder name
   ansible.builtin.find:
@@ -77,7 +77,7 @@
     file_type: directory
     depth: 1
   register: top_level_folder
-
+  when: ansible_os_family in ['Debian', 'RedHat']
 
 
 
@@ -87,8 +87,8 @@
   args:
     creates: /opt/sonarqube/bin
   loop: "{{ top_level_folder.files }}"
-  when: top_level_folder.matched == 1
-
+  when: top_level_folder.matched == 1 and ansible_os_family in ['Debian', 'RedHat']
+  
 # 12. Remove temp unzip dir
 - name: Clean up temporary unzip directory
   file:
@@ -139,13 +139,13 @@
   yum:
     name: firewalld
     state: present
-
+  when: ansible_os_family == "RedHat"
 - name: Ensure firewalld is running and enabled
   systemd:
     name: firewalld
     state: started
     enabled: yes
-
+  when: ansible_os_family == "RedHat"
 - name: Open SonarQube port in firewalld
   firewalld:
     port: "{{ sonarqube_port }}/tcp"
@@ -185,5 +185,23 @@
     - /opt/sonarqube/temp
   
   
+- name: start sonarqube
+  shell: |
+    su {{ sonarqube_user }} -c 'bash /opt/sonarqube/bin/linux-x86-64/sonar.sh start'
+    
+  register: sonarqube_status
+  
+- name: Check SonarQube status
+  become: yes
+  become_user: "{{ sonarqube_user }}"
+  shell: |
+    bash /opt/sonarqube/bin/linux-x86-64/sonar.sh status
+  register: sonarqube_status
+  changed_when: false
+
+- name: Display SonarQube status
+  debug:
+    msg: "{{ sonarqube_status.stdout }}"
+
 
 

@@ -8,9 +8,8 @@
 - name: Setup PostgreSQL
   include_tasks: postgres.yml
 
-
+- name: Apply kernel settings required for SonarQube
+  include_tasks: sysctl.yml
 
 - name: Install and configure SonarQube
   include_tasks: sonarqube.yml
-- name: Apply kernel settings required for SonarQube
-  include_tasks: sysctl.yml

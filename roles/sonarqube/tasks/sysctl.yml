@@ -12,3 +12,6 @@
     value: '131072'
     state: present
     reload: yes
+  notify:
+    - reload systemd
+    - enable sonarqube

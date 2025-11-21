@@ -1,22 +1,24 @@
 ---
 # handlers file for sonarqube
 # /etc/systemd/system/sonarqube.service
-- name: restart postgresql
-  service:
-    name: postgresql
-    state: restarted
+
 
 - name: reload systemd
   systemd:
     daemon_reload: yes
 
-- name: enable sonarqube
-  #shell: "/opt/sonarqube/bin/linux-x86-64/sonar.sh restart"
+- name: restart postgresql
   service:
-    name: sonarqube
-    state: enable
-- name: start sonarqube
+    name: postgresql
+    state: restarted
+    enabled: yes
+  when: ansible_os_family == "Debian"
+
+#- name: enable sonarqube
   #shell: "/opt/sonarqube/bin/linux-x86-64/sonar.sh restart"
-  service:
-    name: sonarqube
-    state: started
+#  service:
+#   name: sonarqube
+#    state: started
+#    enabled: yes
+
+

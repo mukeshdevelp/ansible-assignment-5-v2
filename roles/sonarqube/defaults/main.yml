@@ -17,8 +17,8 @@ java_pkg: "{{ java_package[ansible_os_family]}}"
 sudo_group: "{{ 'wheel' if ansible_os_family == 'RedHat' else 'sudo' }}"
 
 
-sonarqube_java_home_debian: /usr/lib/jvm/java-{{ java_version}}-openjdk-amd64"
-sonarqube_java_home_redhat: /usr/lib/jvm/java-{{ java_version}}-openjdk"
+sonarqube_java_home_debian: "/usr/lib/jvm/java-{{ java_version}}-openjdk-amd64"
+sonarqube_java_home_redhat: "/usr/lib/jvm/java-{{ java_version}}-openjdk"
 sonarqube_install_dir: /opt/sonarqube
 # https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-25.8.0.112029.zip
 sonarqube_download_url: https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip
