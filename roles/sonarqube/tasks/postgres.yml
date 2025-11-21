@@ -35,7 +35,16 @@
 
       when: ansible_os_family == "Debian"
       
+    - name: Reload systemd
+      command: systemctl daemon-reload
+      when: ansible_os_family == "Debian"
     
+    - name: restart postgresql
+      service:
+        name: postgresql-{{ postgresql_version }}
+        state: restarted
+        enabled: yes
+      when: ansible_os_family == "Debian"
     
     # postgres installatio on debian based system
 
