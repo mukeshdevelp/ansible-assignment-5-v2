@@ -1,7 +1,7 @@
 [Unit]
 Description=SonarQube service
-After=network.target postgresql.service
-Wants=postgresql.service
+After=network.target postgresql-{{ postgresql_version }}.service
+Wants=postgresql-{{ postgresql_version }}.service
 
 [Service]
 Type=forking
