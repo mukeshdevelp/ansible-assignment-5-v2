@@ -43,6 +43,9 @@
   package:
     name: unzip
     state: present
+  timeout: 300  # 5 minutes timeout
+  retries: 3
+  delay: 10
   when: ansible_os_family in ['Debian', 'RedHat']
 
 # 4. Download SonarQube ZIP archive
@@ -139,6 +142,9 @@
   yum:
     name: firewalld
     state: present
+  timeout: 300  # 5 minutes timeout
+  retries: 3
+  delay: 10
   when: ansible_os_family == "RedHat"
 - name: Ensure firewalld is running and enabled
   systemd:
@@ -160,6 +166,9 @@
   apt:
     name: ufw
     state: present
+  timeout: 300  # 5 minutes timeout
+  retries: 3
+  delay: 10
   when: ansible_os_family == "Debian"
 
 - name: Allow SonarQube port (Debian)

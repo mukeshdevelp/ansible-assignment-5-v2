@@ -1,9 +1,30 @@
 ---
+- name: Wait for SSH to be ready
+  wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 22
+    delay: 10
+    timeout: 300
+
+# Test internet connectivity before apt update
+- name: Test internet connectivity
+  command: ping -c 3 8.8.8.8
+  register: ping_result
+  ignore_errors: yes
+  changed_when: false
+
+- name: Display connectivity test result
+  debug:
+    msg: "Internet connectivity test: {{ 'PASSED' if ping_result.rc == 0 else 'FAILED - Check NAT Gateway' }}"
+  when: ping_result.rc is defined
 
 # update caches for ubuntu and debian based systems
 - name: Update package cache on Debian/Ubuntu
   apt:
     update_cache: yes
+  timeout: 300  # 5 minutes timeout
+  retries: 3
+  delay: 10
   when: ansible_facts['os_family'] == "Debian"
 # update caches for redhat based systems
 - name: Update package cache on RedHat/CentOS/RHEL
@@ -16,6 +37,9 @@
   package:
     name: "{{ java_pkg }}"
     state: present
+  timeout: 600  # 10 minutes timeout for package installation
+  retries: 3
+  delay: 10
 
 - name: Get Java version
   command: java -version

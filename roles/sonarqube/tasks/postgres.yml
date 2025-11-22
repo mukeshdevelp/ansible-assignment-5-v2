@@ -1,11 +1,13 @@
 ---
 - name: Install postgresql on debian based systems
   block:
-    # updaye caches
+    # update caches
     - name: Update apt cache
-      shell: |
-        sudo apt-get update -y
-       
+      apt:
+        update_cache: yes
+      timeout: 300  # 5 minutes timeout
+      retries: 3
+      delay: 10
       when: ansible_facts['os_family'] == "Debian"
     
     # install postgresql common for pgdg setup script
@@ -26,6 +28,9 @@
     - name: Update apt cache after PGDG script
       apt:
         update_cache: yes
+      timeout: 300  # 5 minutes timeout
+      retries: 3
+      delay: 10
       when: ansible_facts['os_family'] == "Debian"
     - name: Install PostgreSQL and contrib
       apt:
@@ -51,12 +56,13 @@
 
     - name: Install PostgreSQL (Ubuntu)
       apt:
-        
         name: 
           - postgresql-{{ postgresql_version }}
-          
         state: present
         update_cache: yes
+      timeout: 600  # 10 minutes timeout for package installation
+      retries: 3
+      delay: 10
       register: postgres_installation_result
       when: ansible_facts['os_family'] == "Debian"
     
