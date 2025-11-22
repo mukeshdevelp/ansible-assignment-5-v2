@@ -1,4 +1,4 @@
-- hosts: redhat
+- hosts: _sonarqube
   # export ANSIBLE_HOST_KEY_CHECKING=False
   gather_facts: true
   become: true
