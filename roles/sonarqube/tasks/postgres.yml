@@ -15,6 +15,9 @@
       apt:
         name: postgresql-common
         state: present
+      timeout: 300  # 5 minutes timeout
+      retries: 3
+      delay: 10
       when: ansible_facts['os_family'] == "Debian"
     
     # run the pgscript available in /usr/share/postgresql-common/pgdg with yes so that it can run
@@ -36,9 +39,10 @@
       apt:
         name:
           - postgresql-{{ postgresql_version }}
-          
         state: present
-
+      timeout: 600  # 10 minutes timeout for package installation
+      retries: 3
+      delay: 10
       when: ansible_facts['os_family'] == "Debian"
       
     - name: Reload systemd
@@ -47,39 +51,18 @@
     
     - name: restart postgresql
       service:
-        name: postgresql-{{ postgresql_version }}
+        name: postgresql
         state: restarted
         enabled: yes
       when: ansible_facts['os_family'] == "Debian"
     
-    # postgres installatio on debian based system
-
-    - name: Install PostgreSQL (Ubuntu)
-      apt:
-        name: 
-          - postgresql-{{ postgresql_version }}
-        state: present
-        update_cache: yes
-      timeout: 600  # 10 minutes timeout for package installation
-      retries: 3
-      delay: 10
-      register: postgres_installation_result
-      when: ansible_facts['os_family'] == "Debian"
-    
-    
-    # cheking if postgres is installed
-    - name: check if postgres is installed
-      debug:
-        msg: "PostgreSQL installed Successfully"
-      when: postgres_installation_result.changed or postgres_installation_result.failed == false
-
-
-    # check if postgresql is initiated and enabled
+    # check if postgresql is initialized and enabled
     - name: Ensure PostgreSQL is initialized and running
       service:
         name: postgresql
         state: started
         enabled: yes
+      when: ansible_facts['os_family'] == "Debian"
     
     - name: Create Database
       become: yes
@@ -106,7 +89,45 @@
       shell: |
         sudo -u postgres psql -c "ALTER DATABASE {{ db_name }} OWNER TO {{ db_user }};"
       register: postgres_owner_result
-  when: ansible_os_family == "Debian"
+    
+    - name: Verify database status
+      become: yes
+      shell: |
+        echo "=== Database Status ==="
+        sudo -u postgres psql -c "\l {{ db_name }}"
+        echo ""
+        echo "=== User Status ==="
+        sudo -u postgres psql -c "\du {{ db_user }}"
+        echo ""
+        echo "=== Database Owner ==="
+        sudo -u postgres psql -tc "SELECT datname, pg_catalog.pg_get_userbyid(datdba) as owner FROM pg_database WHERE datname='{{ db_name }}';"
+      register: db_status_result
+      changed_when: false
+      
+    - name: Display database status
+      debug:
+        var: db_status_result.stdout_lines
+      
+    - name: Check if database actually exists
+      become: yes
+      shell: |
+        if sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1; then
+          echo "✅ Database EXISTS"
+        else
+          echo "❌ Database NOT FOUND"
+        fi
+        if sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1; then
+          echo "✅ User EXISTS"
+        else
+          echo "❌ User NOT FOUND"
+        fi
+      register: db_check_final
+      changed_when: false
+      
+    - name: Final database check result
+      debug:
+        var: db_check_final.stdout_lines
+  when: ansible_facts['os_family'] == "Debian"
     #-------------------------working code above this line-----------------------------
 
 
@@ -194,15 +215,18 @@
 
   when: ansible_facts['os_family'] == "RedHat"
 #-----------------------working code above this line ---------------------------------
-# Debug results
+
 #-----------------------working code down this line ---------------------------------
-- name: outputting results
+- name: Database setup summary
   debug:
     msg:
-      - "this is user creation result: {{ postgres_user_result.stdout_lines }}"
-      - "this is db creation result: {{ postgres_db_result.stdout_lines }}"
-      - "this is privileges creation result: {{ postgres_privileges_result.stdout_lines }}"
-      - "this is changing ownership  result: {{ postgres_owner_result.stdout_lines }}"
+      - "Database created: {{ postgres_db_result.changed }}"
+      - "User created: {{ postgres_user_result.changed }}"
+      - "Privileges granted: {{ postgres_privileges_result.changed }}"
+      - "Ownership changed: {{ postgres_owner_result.changed }}"
+  when: 
+    - postgres_user_result is defined
+    - postgres_db_result is defined
 
 
 

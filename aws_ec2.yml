@@ -14,7 +14,7 @@ hostnames:
 compose:
   ansible_host: private_ip_address
   ansible_user: ubuntu
-  ansible_ssh_private_key_file: "sonarqube-key.pem"
+  ansible_ssh_private_key_file: "{{ lookup('env','WORKSPACE') }}/.ssh/sonarqube-key.pem"
 keyed_groups:
   - key: tags.env
   - key: tags.Name

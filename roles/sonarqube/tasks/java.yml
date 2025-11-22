@@ -1,10 +1,5 @@
 ---
-- name: Wait for SSH to be ready
-  wait_for:
-    host: "{{ inventory_hostname }}"
-    port: 22
-    delay: 10
-    timeout: 300
+
 
 # Test internet connectivity before apt update
 - name: Test internet connectivity

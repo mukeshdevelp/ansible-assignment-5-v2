@@ -14,11 +14,18 @@
     enabled: yes
   when: ansible_os_family == "Debian"
 
-#- name: enable sonarqube
-  #shell: "/opt/sonarqube/bin/linux-x86-64/sonar.sh restart"
-#  service:
-#   name: sonarqube
-#    state: started
-#    enabled: yes
+- name: enable sonarqube
+  systemd:
+    name: sonarqube
+    state: started
+    enabled: yes
+
+- name: restart sonarqube
+  systemd:
+    name: sonarqube
+    state: restarted
+    enabled: yes
+  when: ansible_facts['os_family'] == "Debian"
+
 
 
