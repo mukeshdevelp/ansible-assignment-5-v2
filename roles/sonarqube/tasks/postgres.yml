@@ -3,7 +3,8 @@
   block:
     # updaye caches
     - name: Update apt cache
-      shell: apt-get update -y
+      shell: |
+        sudo apt-get update -y
        
       when: ansible_facts['os_family'] == "Debian"
     
