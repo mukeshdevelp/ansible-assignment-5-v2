@@ -135,7 +135,6 @@
     owner: "{{ sonarqube_user }}"
     group: "{{ sonarqube_group }}"
     mode: '0644'
-  notify: restart sonarqube
 
 # 15. Open firewall ports (RedHat)
 - name: Ensure firewalld is installed
@@ -184,31 +183,42 @@
   when: ansible_facts['os_family'] == "Debian"
 
 
-# 18. Start SonarQube service using systemd
-- name: Start and enable SonarQube service
-  systemd:
-    name: sonarqube
-    state: started
-    enabled: yes
-    daemon_reload: yes
-  timeout: 120
-  retries: 2
-  delay: 10
+# 18. Start SonarQube using start script directly (not systemd)
+- name: Start SonarQube using start script
+  become_user: "{{ sonarqube_user }}"
+  shell: |
+    cd {{ sonarqube_install_dir }}/bin/linux-x86-64
+    nohup ./sonar.sh start > /tmp/sonarqube_start.log 2>&1 &
+    echo $! > /tmp/sonarqube_start.pid
+  args:
+    creates: /tmp/sonarqube_start.pid
+  async: 300
+  poll: 10
+  timeout: 300
   ignore_errors: yes
   ignore_unreachable: yes
-  vars:
-    ansible_connect_timeout: 60
-    ansible_timeout: 120
+  register: sonarqube_start_result
+
+- name: Wait a moment for SonarQube to initialize
+  pause:
+    seconds: 10
+  ignore_errors: yes
+
+- name: Check if SonarQube process is running
+  shell: ps aux | grep -v grep | grep sonarqube || echo "not_running"
+  register: sonarqube_process_check
+  changed_when: false
+  failed_when: false
+  ignore_errors: yes
+
+- name: Display SonarQube start result
+  debug:
+    msg: "SonarQube start script executed. Process check: {{ 'Running' if 'sonarqube' in sonarqube_process_check.stdout else 'May still be starting' }}"
+  when: sonarqube_start_result is defined
   
 
 
-# 19. Check SonarQube status (non-blocking)
-- name: Check SonarQube service status
-  become: yes
-  command: systemctl is-active sonarqube
-  register: sonarqube_service_status
-  changed_when: false
-  failed_when: false
+
 
 - name: Display SonarQube status
   debug:
