@@ -145,6 +145,13 @@
     state: started
     enabled: yes
   when: ansible_os_family == "RedHat"
+- name: Allow SSH port in firewalld (RedHat) - CRITICAL: Must be before other rules
+  firewalld:
+    port: "22/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  when: ansible_facts['os_family'] == "RedHat"
 - name: Open SonarQube port in firewalld
   firewalld:
     port: "{{ sonarqube_port }}/tcp"
@@ -164,6 +171,23 @@
   delay: 10
   when: ansible_facts['os_family'] == "Debian"
 
+- name: Allow SSH port (Debian) - CRITICAL: Must be before enabling UFW
+  shell: |
+    # Ensure SSH is allowed before enabling UFW (prevents lockout)
+    ufw allow 22/tcp || true
+    echo "SSH rule (port 22) added to UFW"
+  register: ssh_rule_result
+  changed_when: "'Rule added' in ssh_rule_result.stdout or 'Skipping' not in ssh_rule_result.stdout"
+  failed_when: false
+  when: ansible_facts['os_family'] == "Debian"
+  
+- name: Verify SSH rule was added
+  debug:
+    msg: "SSH rule (port 22) status: {{ ssh_rule_result.stdout_lines | default(['Unknown']) | join(', ') }}"
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - ssh_rule_result is defined
+
 - name: Allow SonarQube port (Debian)
   community.general.ufw:
     rule: allow
@@ -171,7 +195,7 @@
     proto: tcp
   when: ansible_facts['os_family'] == "Debian"
 
-- name: Enable UFW
+- name: Enable UFW (Debian)
   community.general.ufw:
     state: enabled
   when: ansible_facts['os_family'] == "Debian"
@@ -179,11 +203,12 @@
 
 # 18. Start SonarQube using start script directly (not systemd)
 - name: Check if SonarQube is already running
-  shell: pgrep -f "sonarqube" || echo "not_running"
+  shell: timeout 10 pgrep -f "sonarqube" || echo "not_running"
   register: sonarqube_running_check
   changed_when: false
   failed_when: false
   ignore_errors: yes
+  timeout: 15
 
 - name: Start SonarQube using start script
   become_user: "{{ sonarqube_user }}"
