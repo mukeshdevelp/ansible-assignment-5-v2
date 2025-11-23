@@ -185,13 +185,16 @@
 
 # 17. Remove stale PID + temp
 - name: Remove stale PID and temp directory
-  
   file:
     path: "{{ item }}"
     state: absent
   loop:
     - /opt/sonarqube/bin/linux-x86-64/SonarQube.pid
     - /opt/sonarqube/temp
+  retries: 3
+  delay: 5
+  until: true
+  ignore_errors: yes
 
 # 18. Start SonarQube service using systemd
 - name: Start and enable SonarQube service

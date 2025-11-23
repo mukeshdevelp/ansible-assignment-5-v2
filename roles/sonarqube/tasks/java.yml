@@ -1,17 +1,22 @@
 ---
 
 
-# Test internet connectivity before apt update
-- name: Test internet connectivity
-  command: ping -c 3 8.8.8.8
-  register: ping_result
-  ignore_errors: yes
+# Test internet connectivity before apt update (using HTTP instead of ping)
+# Note: ICMP (ping) is often blocked by AWS/cloud providers, but HTTP works fine through NAT Gateway
+- name: Test internet connectivity via HTTP
+  uri:
+    url: http://archive.ubuntu.com
+    method: GET
+    status_code: [200, 301, 302, 303, 307, 308]
+    timeout: 10
+  register: connectivity_test
   changed_when: false
+  failed_when: false
+  ignore_errors: yes
 
 - name: Display connectivity test result
   debug:
-    msg: "Internet connectivity test: {{ 'PASSED' if ping_result.rc == 0 else 'FAILED - Check NAT Gateway' }}"
-  when: ping_result.rc is defined
+    msg: "Internet connectivity test: {{ 'PASSED' if connectivity_test.status in [200, 301, 302, 303, 307, 308] else 'FAILED - Check NAT Gateway' }}"
 
 # update caches for ubuntu and debian based systems
 - name: Update package cache on Debian/Ubuntu

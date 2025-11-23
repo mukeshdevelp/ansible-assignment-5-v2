@@ -15,8 +15,8 @@ compose:
   ansible_host: private_ip_address
   ansible_user: ubuntu
   ansible_ssh_private_key_file: "{{ lookup('env','WORKSPACE') | default('/var/lib/jenkins/workspace/aws-infra-pipeline') }}/.ssh/sonarqube-key.pem"
-  ansible_ssh_common_args: "-o ControlMaster=no -o ControlPath=none -o ControlPersist=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ConnectTimeout=20 -o BatchMode=yes -o TCPKeepAlive=yes"
-  ansible_ssh_timeout: 20
+  ansible_ssh_common_args: "-o ControlMaster=no -o ControlPath=none -o ControlPersist=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=5 -o ServerAliveCountMax=12 -o ConnectTimeout=30 -o BatchMode=yes -o TCPKeepAlive=yes -o Compression=no"
+  ansible_ssh_timeout: 60
 keyed_groups:
   - key: tags.env
     prefix: ""
