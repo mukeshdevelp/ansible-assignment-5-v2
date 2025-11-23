@@ -1,7 +1,15 @@
-- hosts: web
-  # export ANSIBLE_HOST_KEY_CHECKING=False
+- hosts: _sonarqube
   gather_facts: true
   become: true
+  
+  vars:
+    ansible_ssh_timeout: 120
+    ansible_ssh_retries: 3
+  
+  # Don't fail playbook if some hosts become unreachable
+  any_errors_fatal: false
+  max_fail_percentage: 100
+  
   # main file
   roles:
     - sonarqube
