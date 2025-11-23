@@ -1,4 +1,4 @@
-- hosts: _sonarqube
+- hosts: _sonarqube:_image_builder
   gather_facts: true
   become: true
   
