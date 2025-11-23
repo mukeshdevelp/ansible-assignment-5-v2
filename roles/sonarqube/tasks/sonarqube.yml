@@ -107,25 +107,19 @@
     recurse: yes
   become: true
 
-# 14. Copy SonarQube service file
+# 14. Copy SonarQube service file (for reference only, not used for starting)
 - name: Copy SonarQube service file
   template:
     src: sonarqube_rh.service.j2
     dest: /etc/systemd/system/sonarqube.service
     mode: '0644'
-  notify:
-    - reload systemd
-    - enable sonarqube
   when: ansible_facts['os_family'] == "RedHat"
-# 14. Copy SonarQube service file
+# 14. Copy SonarQube service file (for reference only, not used for starting)
 - name: Copy SonarQube service file debian
   template:
     src: sonarqube_db.service.j2
     dest: /etc/systemd/system/sonarqube.service
     mode: '0644'
-  notify:
-    - reload systemd
-    - enable sonarqube
   when: ansible_facts['os_family'] == "Debian"
 # 15. Configure sonar.properties
 - name: Configure SonarQube
