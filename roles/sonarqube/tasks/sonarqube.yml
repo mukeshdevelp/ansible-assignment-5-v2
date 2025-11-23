@@ -183,19 +183,6 @@
     state: enabled
   when: ansible_facts['os_family'] == "Debian"
 
-# 17. Remove stale PID + temp
-- name: Remove stale PID and temp directory
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /opt/sonarqube/bin/linux-x86-64/SonarQube.pid
-    - /opt/sonarqube/temp
-  timeout: 30
-  ignore_errors: yes
-  vars:
-    ansible_connect_timeout: 30
-    ansible_timeout: 30
 
 # 18. Start SonarQube service using systemd
 - name: Start and enable SonarQube service
@@ -208,6 +195,7 @@
   retries: 2
   delay: 10
   ignore_errors: yes
+  ignore_unreachable: yes
   vars:
     ansible_connect_timeout: 60
     ansible_timeout: 120
