@@ -1,7 +1,10 @@
-- hosts: web-server
-  # export ANSIBLE_HOST_KEY_CHECKING=False
+- hosts: _sonarqube
   gather_facts: true
   become: true
+  
+  vars:
+    ansible_ssh_timeout: 30
+    ansible_ssh_retries: 3
   
   roles:
     - sonarqube
