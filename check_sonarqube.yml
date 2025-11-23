@@ -1,0 +1,33 @@
+---
+- hosts: sonarqube-server
+  become: yes
+  tasks:
+    - name: Check SonarQube status
+      shell: su sonar -c 'bash /opt/sonarqube/bin/linux-x86-64/sonar.sh status'
+      register: status
+      changed_when: false
+      failed_when: false
+    
+    - name: Display status
+      debug:
+        var: status.stdout
+    
+    - name: Start SonarQube if not running
+      shell: su sonar -c 'bash /opt/sonarqube/bin/linux-x86-64/sonar.sh start'
+      when: "'not running' in status.stdout"
+      register: start_result
+    
+    - name: Display start result
+      debug:
+        var: start_result.stdout
+      when: start_result is defined
+    
+    - name: Check processes
+      shell: ps aux | grep -i sonar | grep -v grep
+      register: processes
+      changed_when: false
+      failed_when: false
+    
+    - name: Display processes
+      debug:
+        var: processes.stdout_lines

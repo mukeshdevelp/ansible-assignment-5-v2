@@ -14,4 +14,3 @@
     reload: yes
   notify:
     - reload systemd
-    - enable sonarqube

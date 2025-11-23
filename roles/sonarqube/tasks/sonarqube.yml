@@ -112,7 +112,6 @@
     mode: '0644'
   notify:
     - reload systemd
-    - enable sonarqube
   when: ansible_os_family == "RedHat"
 # 14. Copy SonarQube service file
 - name: Copy SonarQube service file debian
@@ -122,7 +121,6 @@
     mode: '0644'
   notify:
     - reload systemd
-    - enable sonarqube
   when: ansible_os_family == "Debian"
 # 15. Configure sonar.properties
 - name: Configure SonarQube
@@ -132,7 +130,6 @@
     owner: "{{ sonarqube_user }}"
     group: "{{ sonarqube_group }}"
     mode: '0644'
-  notify: restart sonarqube
 
 # 15. Open firewall ports (RedHat)
 - name: Ensure firewalld is installed
@@ -192,12 +189,11 @@
   register: sonarqube_status
   
 - name: Check SonarQube status
-  become: yes
-  become_user: "{{ sonarqube_user }}"
   shell: |
-    bash /opt/sonarqube/bin/linux-x86-64/sonar.sh status
+    su {{ sonarqube_user }} -c 'bash /opt/sonarqube/bin/linux-x86-64/sonar.sh status'
   register: sonarqube_status
   changed_when: false
+  failed_when: false
 
 - name: Display SonarQube status
   debug:

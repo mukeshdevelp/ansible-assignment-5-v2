@@ -41,7 +41,7 @@
     
     - name: restart postgresql
       service:
-        name: postgresql-{{ postgresql_version }}
+        name: postgresql
         state: restarted
         enabled: yes
       when: ansible_os_family == "Debian"
@@ -191,10 +191,13 @@
 - name: outputting results
   debug:
     msg:
-      - "this is user creation result: {{ postgres_user_result.stdout_lines }}"
-      - "this is db creation result: {{ postgres_db_result.stdout_lines }}"
-      - "this is privileges creation result: {{ postgres_privileges_result.stdout_lines }}"
-      - "this is changing ownership  result: {{ postgres_owner_result.stdout_lines }}"
+      - "User creation result: {{ postgres_user_result.changed | default('N/A') }}"
+      - "Database creation result: {{ postgres_db_result.changed | default('N/A') }}"
+      - "Privileges creation result: {{ postgres_privileges_result.changed | default('N/A') }}"
+      - "Changing ownership result: {{ postgres_owner_result.changed | default('N/A') }}"
+  when:
+    - postgres_user_result is defined
+    - postgres_db_result is defined
 
 
 
