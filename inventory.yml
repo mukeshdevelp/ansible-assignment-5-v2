@@ -1,9 +1,1 @@
----
-all:
-  children:
-    web:
-      hosts:
-        sonarqube-server:
-          ansible_host: ec2-18-207-216-31.compute-1.amazonaws.com
-          ansible_user: ubuntu
-          ansible_ssh_private_key_file: /home/mukesh/Downloads/mukesh_sonarqube.pem
+
