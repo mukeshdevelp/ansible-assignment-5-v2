@@ -6,5 +6,9 @@
     ansible_ssh_timeout: 30
     ansible_ssh_retries: 3
   
+  # Don't fail playbook if some hosts become unreachable
+  any_errors_fatal: false
+  max_fail_percentage: 100
+  
   roles:
     - sonarqube
