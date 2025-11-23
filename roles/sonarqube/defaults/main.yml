@@ -37,3 +37,10 @@ db_name: sonarqube_3
 db_port: 5432
 postgresql_version: "18"
 
+# Firewall configuration
+# Set to false to skip UFW enable during playbook (prevents SSH lockout during execution)
+# Rules will still be added (SSH + SonarQube), but UFW won't be enabled
+# You can enable UFW manually after playbook completes: sudo ufw enable
+# Default: false (recommended for CI/CD pipelines to prevent SSH lockout)
+enable_ufw_during_playbook: false
+

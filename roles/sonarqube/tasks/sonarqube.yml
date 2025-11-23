@@ -151,6 +151,15 @@
     permanent: yes
     state: enabled
     immediate: yes
+  register: firewalld_ssh_result
+  failed_when: false
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Verify SSH port is allowed in firewalld (RedHat)
+  shell: firewall-cmd --list-ports | grep -q "22/tcp" && echo "SSH_ALLOWED" || echo "SSH_NOT_ALLOWED"
+  register: firewalld_ssh_verify
+  changed_when: false
+  failed_when: "'SSH_NOT_ALLOWED' in firewalld_ssh_verify.stdout"
   when: ansible_facts['os_family'] == "RedHat"
 - name: Open SonarQube port in firewalld
   firewalld:
@@ -171,22 +180,81 @@
   delay: 10
   when: ansible_facts['os_family'] == "Debian"
 
+- name: Check if UFW is already enabled and blocking SSH (Debian)
+  shell: |
+    if ufw status | grep -q "Status: active"; then
+      if ufw status | grep -q "22/tcp"; then
+        echo "UFW_ENABLED_SSH_ALLOWED"
+      else
+        echo "UFW_ENABLED_SSH_BLOCKED"
+      fi
+    else
+      echo "UFW_INACTIVE"
+    fi
+  register: ufw_initial_status
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Fix SSH access if UFW is blocking it (Debian)
+  shell: |
+    # If UFW is enabled but SSH is blocked, add SSH rule immediately
+    if echo "{{ ufw_initial_status.stdout }}" | grep -q "UFW_ENABLED_SSH_BLOCKED"; then
+      echo "⚠️  UFW is enabled but SSH is blocked! Adding SSH rule..."
+      echo "y" | ufw allow 22/tcp
+      echo "✅ SSH rule added to active UFW"
+    else
+      echo "No action needed - SSH is already allowed or UFW is inactive"
+    fi
+  register: ufw_ssh_fix
+  changed_when: "'SSH rule added' in ufw_ssh_fix.stdout"
+  failed_when: false
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - ufw_initial_status is defined
+
+- name: Check current UFW status
+  shell: ufw status | head -5 || echo "UFW inactive"
+  register: ufw_status_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Display UFW status before changes
+  debug:
+    msg: "Current UFW status: {{ ufw_status_check.stdout_lines | default(['Unknown']) | join(' | ') }}"
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - ufw_status_check is defined
+
 - name: Allow SSH port (Debian) - CRITICAL: Must be before enabling UFW
   shell: |
-    # Ensure SSH is allowed before enabling UFW (prevents lockout)
-    ufw allow 22/tcp || true
-    echo "SSH rule (port 22) added to UFW"
+    # CRITICAL: Always ensure SSH is allowed BEFORE enabling UFW
+    # This prevents SSH lockout during playbook execution
+    if ufw status | grep -q "22/tcp"; then
+      echo "SSH rule (port 22) already exists"
+    else
+      echo "y" | ufw allow 22/tcp
+      echo "SSH rule (port 22) added to UFW"
+    fi
   register: ssh_rule_result
-  changed_when: "'Rule added' in ssh_rule_result.stdout or 'Skipping' not in ssh_rule_result.stdout"
+  changed_when: "'added' in ssh_rule_result.stdout or 'Rule added' in ssh_rule_result.stdout"
   failed_when: false
   when: ansible_facts['os_family'] == "Debian"
   
-- name: Verify SSH rule was added
+- name: Verify SSH rule exists before proceeding
+  shell: ufw status | grep -q "22/tcp" && echo "SSH_ALLOWED" || echo "SSH_NOT_ALLOWED"
+  register: ssh_rule_verify
+  changed_when: false
+  failed_when: "'SSH_NOT_ALLOWED' in ssh_rule_verify.stdout"
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Display SSH rule verification
   debug:
-    msg: "SSH rule (port 22) status: {{ ssh_rule_result.stdout_lines | default(['Unknown']) | join(', ') }}"
+    msg: "SSH rule verification: {{ ssh_rule_verify.stdout }}"
   when: 
     - ansible_facts['os_family'] == "Debian"
-    - ssh_rule_result is defined
+    - ssh_rule_verify is defined
 
 - name: Allow SonarQube port (Debian)
   community.general.ufw:
@@ -195,10 +263,113 @@
     proto: tcp
   when: ansible_facts['os_family'] == "Debian"
 
-- name: Enable UFW (Debian)
-  community.general.ufw:
-    state: enabled
+- name: Verify both SSH and SonarQube rules exist before enabling UFW
+  shell: |
+    SSH_RULE=$(ufw status | grep -c "22/tcp" || echo "0")
+    SONAR_RULE=$(ufw status | grep -c "{{ sonarqube_port }}/tcp" || echo "0")
+    if [ "$SSH_RULE" -ge 1 ] && [ "$SONAR_RULE" -ge 1 ]; then
+      echo "ALL_RULES_PRESENT"
+    else
+      echo "MISSING_RULES: SSH=$SSH_RULE, SonarQube=$SONAR_RULE"
+      exit 1
+    fi
+  register: rules_verify
+  changed_when: false
+  failed_when: "'MISSING_RULES' in rules_verify.stdout"
   when: ansible_facts['os_family'] == "Debian"
+
+- name: Configure UFW default policy to allow established connections (Debian)
+  shell: |
+    # Set default policy to allow established/related connections
+    # This prevents UFW from blocking existing SSH connections
+    ufw default allow outgoing
+    ufw default deny incoming
+    # Allow established and related connections
+    ufw allow in on any from any to any port 22 proto tcp comment 'SSH - allow established'
+  register: ufw_default_policy
+  changed_when: true
+  failed_when: false
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Enable UFW (Debian) - Only after SSH rule is confirmed
+  shell: |
+    # CRITICAL: Verify SSH rule exists before enabling UFW
+    # This prevents SSH lockout during playbook execution
+    if ! ufw status | grep -q "22/tcp"; then
+      echo "❌ ERROR: SSH rule (22/tcp) not found! Cannot enable UFW."
+      echo "Adding SSH rule now as last resort..."
+      echo "y" | ufw allow 22/tcp
+      sleep 1
+      # Verify again
+      if ! ufw status | grep -q "22/tcp"; then
+        echo "❌ CRITICAL: Failed to add SSH rule! Aborting UFW enable."
+        exit 1
+      fi
+    fi
+    
+    # Check if UFW is already enabled
+    if ufw status | grep -q "Status: active"; then
+      echo "UFW is already enabled, verifying SSH rule exists..."
+      if ufw status | grep -q "22/tcp"; then
+        echo "✅ UFW already enabled with SSH rule - no action needed"
+      else
+        echo "⚠️  UFW enabled but SSH missing - adding now..."
+        echo "y" | ufw allow 22/tcp
+      fi
+    else
+      # UFW is inactive - enable it with SSH rule confirmed
+      echo "✅ SSH rule confirmed, enabling UFW..."
+      # Use --force to avoid prompts, but ensure SSH rule is there first
+      echo "y" | ufw --force enable
+      echo "✅ UFW enabled with SSH access maintained"
+    fi
+  register: ufw_enable_result
+  changed_when: "'UFW enabled' in ufw_enable_result.stdout or 'adding now' in ufw_enable_result.stdout"
+  failed_when: "'CRITICAL' in ufw_enable_result.stdout or ufw_enable_result.rc != 0"
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - enable_ufw_during_playbook | default(true) | bool
+
+- name: Skip UFW enable (rules added but not enabled)
+  debug:
+    msg: |
+      ⚠️  UFW enable skipped (enable_ufw_during_playbook=false)
+      SSH rule (22/tcp) and SonarQube rule ({{ sonarqube_port }}/tcp) have been added.
+      UFW is configured but NOT enabled to prevent SSH lockout during playbook.
+      You can enable UFW manually after playbook completes:
+        sudo ufw enable
+      Or set enable_ufw_during_playbook=true to enable during playbook.
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - not (enable_ufw_during_playbook | default(true) | bool)
+
+- name: Verify UFW rules are configured (Debian)
+  shell: |
+    UFW_STATUS=$(ufw status 2>/dev/null | head -1 | grep -o "active\|inactive" || echo "unknown")
+    SSH_RULE=$(ufw status 2>/dev/null | grep -c "22/tcp" || echo "0")
+    SONAR_RULE=$(ufw status 2>/dev/null | grep -c "{{ sonarqube_port }}/tcp" || echo "0")
+    echo "UFW_STATUS=$UFW_STATUS|SSH_RULE_COUNT=$SSH_RULE|SONAR_RULE_COUNT=$SONAR_RULE"
+  register: ufw_final_check
+  changed_when: false
+  failed_when: "'SSH_RULE_COUNT=0' in ufw_final_check.stdout or 'SONAR_RULE_COUNT=0' in ufw_final_check.stdout"
+  when: ansible_facts['os_family'] == "Debian"
+  timeout: 10
+
+- name: Display final UFW status
+  debug:
+    msg: |
+      Final UFW Configuration:
+      {{ ufw_final_check.stdout }}
+      {% if enable_ufw_during_playbook | default(false) | bool %}
+      UFW Enable Result: {{ ufw_enable_result.stdout_lines | default([]) | join(' | ') }}
+      {% else %}
+      ⚠️  UFW enable was skipped (enable_ufw_during_playbook=false)
+      Rules are configured but UFW is not enabled.
+      Enable manually after playbook: sudo ufw enable
+      {% endif %}
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - ufw_final_check is defined
 
 
 # 18. Start SonarQube using start script directly (not systemd)
