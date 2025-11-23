@@ -178,28 +178,38 @@
 
 
 # 18. Start SonarQube using start script directly (not systemd)
+- name: Check if SonarQube is already running
+  shell: pgrep -f "sonarqube" || echo "not_running"
+  register: sonarqube_running_check
+  changed_when: false
+  failed_when: false
+  ignore_errors: yes
+
 - name: Start SonarQube using start script
   become_user: "{{ sonarqube_user }}"
   shell: |
     cd {{ sonarqube_install_dir }}/bin/linux-x86-64
-    nohup ./sonar.sh start > /tmp/sonarqube_start.log 2>&1 &
-    echo $! > /tmp/sonarqube_start.pid
-  args:
-    creates: /tmp/sonarqube_start.pid
+    if [ -f ./sonar.sh ]; then
+      ./sonar.sh start
+    else
+      echo "ERROR: sonar.sh not found at {{ sonarqube_install_dir }}/bin/linux-x86-64/sonar.sh"
+      exit 1
+    fi
   async: 300
   poll: 10
   timeout: 300
   ignore_errors: yes
   ignore_unreachable: yes
   register: sonarqube_start_result
+  when: "'not_running' in sonarqube_running_check.stdout"
 
 - name: Wait a moment for SonarQube to initialize
   pause:
-    seconds: 10
+    seconds: 15
   ignore_errors: yes
 
-- name: Check if SonarQube process is running
-  shell: ps aux | grep -v grep | grep sonarqube || echo "not_running"
+- name: Verify SonarQube process is running
+  shell: pgrep -f "sonarqube" || echo "not_running"
   register: sonarqube_process_check
   changed_when: false
   failed_when: false
@@ -207,16 +217,11 @@
 
 - name: Display SonarQube start result
   debug:
-    msg: "SonarQube start script executed. Process check: {{ 'Running' if 'sonarqube' in sonarqube_process_check.stdout else 'May still be starting' }}"
-  when: sonarqube_start_result is defined
-  
-
-
-
-
-- name: Display SonarQube status
-  debug:
-    msg: "SonarQube service is {{ sonarqube_service_status.stdout | default('unknown') }}"
+    msg: |
+      SonarQube start status:
+      - Start command executed: {{ 'Yes' if sonarqube_start_result is defined and sonarqube_start_result.ansible_job_id is defined else 'Skipped (already running)' }}
+      - Process running: {{ 'Yes' if 'not_running' not in sonarqube_process_check.stdout else 'No' }}
+      - Process PID: {{ sonarqube_process_check.stdout if 'not_running' not in sonarqube_process_check.stdout else 'N/A' }}
 
 
 
