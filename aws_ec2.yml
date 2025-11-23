@@ -19,7 +19,10 @@ compose:
   ansible_ssh_timeout: 20
 keyed_groups:
   - key: tags.env
+    prefix: ""
+    separator: "_"
   - key: tags.Name
+    prefix: ""
 
 strict: False
 
