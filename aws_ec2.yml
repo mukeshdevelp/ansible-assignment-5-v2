@@ -5,20 +5,29 @@ regions:
   - us-east-1
 
 filters:
+  # Include Image Builder EC2 and SonarQube instances
+  # Both have tag:env = "sonarqube"
   "tag:env": "sonarqube"
-  
+  instance-state-name: running
 
 hostnames:
-  - private-ip-address
-  
+  # Use public IP for Image Builder, private IP for others
+  - ip-address
+
 compose:
-  ansible_host: private_ip_address
+  # Use public IP for Image Builder (has public IP), private IP for private instances
+  ansible_host: "{{ public_ip_address if tags.type == 'image-builder' and public_ip_address is defined else private_ip_address }}"
   ansible_user: ubuntu
   ansible_ssh_private_key_file: "{{ lookup('env','WORKSPACE') | default('/var/lib/jenkins/workspace/aws-infra-pipeline') }}/.ssh/sonarqube-key.pem"
-  ansible_ssh_common_args: "-o ControlMaster=no -o ControlPath=none -o ControlPersist=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=3 -o ServerAliveCountMax=40 -o ConnectTimeout=60 -o BatchMode=yes -o TCPKeepAlive=yes -o Compression=no"
+  # No ProxyJump for Image Builder (has public IP), use ProxyJump for private instances
+  ansible_ssh_common_args: "{{ '-o ControlMaster=no -o ControlPath=none -o ControlPersist=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=3 -o ServerAliveCountMax=40 -o ConnectTimeout=60 -o BatchMode=yes -o TCPKeepAlive=yes -o Compression=no' if tags.type == 'image-builder' else ('-o ControlMaster=no -o ControlPath=none -o ControlPersist=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=3 -o ServerAliveCountMax=40 -o ConnectTimeout=60 -o BatchMode=yes -o TCPKeepAlive=yes -o Compression=no -o ProxyJump=ubuntu@' + (lookup('env','BASTION_IP') | default('')) + ' -o IdentityFile=' + lookup('env','WORKSPACE') | default('/var/lib/jenkins/workspace/aws-infra-pipeline') + '/.ssh/sonarqube-key.pem') }}"
   ansible_ssh_timeout: 120
+
 keyed_groups:
   - key: tags.env
+    prefix: ""
+    separator: "_"
+  - key: tags.type
     prefix: ""
     separator: "_"
   - key: tags.Name

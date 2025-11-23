@@ -1,14 +1,27 @@
-- hosts: _sonarqube
+- hosts: _sonarqube:_image_builder
   gather_facts: true
   become: true
   
   vars:
-    ansible_ssh_timeout: 30
+    ansible_ssh_timeout: 120
     ansible_ssh_retries: 3
   
   # Don't fail playbook if some hosts become unreachable
   any_errors_fatal: false
   max_fail_percentage: 100
+  
+  # Wait for instances to be ready before gathering facts
+  pre_tasks:
+    - name: Wait for SSH to be available
+      wait_for:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: 22
+        delay: 10
+        timeout: 300
+      delegate_to: localhost
+      become: false
+      ignore_errors: yes
+      when: ansible_host is defined
   
   roles:
     - sonarqube
