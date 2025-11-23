@@ -204,6 +204,13 @@
     state: started
     enabled: yes
     daemon_reload: yes
+  timeout: 120
+  retries: 2
+  delay: 10
+  ignore_errors: yes
+  vars:
+    ansible_connect_timeout: 60
+    ansible_timeout: 120
   
 
 
