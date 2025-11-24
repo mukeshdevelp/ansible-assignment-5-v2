@@ -14,8 +14,25 @@ hostnames:
 compose:
   ansible_host: private_ip_address
   ansible_user: ubuntu
-  ansible_ssh_private_key_file: "{{ lookup('env','WORKSPACE') }}/.ssh/sonarqube-key.pem"
-  ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPath=~/.ansible/cp/%%h-%%p-%%r -o ControlPersist=2400 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=30 -o ConnectTimeout=60 -o BatchMode=yes -o TCPKeepAlive=yes -o Compression=no"
+  # SSH key path: Use WORKSPACE if set (Jenkins), otherwise use home directory (bastion)
+  ansible_ssh_private_key_file: "{{ (lookup('env','WORKSPACE') + '/.ssh/sonarqube-key.pem') if (lookup('env','WORKSPACE', default='') != '') else '~/.ssh/sonarqube-key.pem' }}"
+  # SSH common args: Add ProxyCommand only if running from Jenkins (WORKSPACE set) and BASTION_HOST set
+  # When running from bastion, no ProxyCommand needed (direct access to private instances)
+  ansible_ssh_common_args: >-
+    -o ControlMaster=auto
+    -o ControlPath=~/.ansible/cp/%%h-%%p-%%r
+    -o ControlPersist=2400
+    -o StrictHostKeyChecking=no
+    -o UserKnownHostsFile=/dev/null
+    -o ServerAliveInterval=60
+    -o ServerAliveCountMax=30
+    -o ConnectTimeout=60
+    -o BatchMode=yes
+    -o TCPKeepAlive=yes
+    -o Compression=no
+    {% if lookup('env','WORKSPACE', default='') != '' and lookup('env','BASTION_HOST', default='') != '' %}
+    -o ProxyCommand="ssh -i {{ lookup('env','WORKSPACE') }}/.ssh/sonarqube-key.pem -W %h:%p -o StrictHostKeyChecking=no ubuntu@{{ lookup('env','BASTION_HOST') }}"
+    {% endif %}
   ansible_ssh_timeout: 300
 keyed_groups:
   - key: tags.env
@@ -27,6 +44,6 @@ keyed_groups:
 
 strict: False
 
-# Use your venv Python
+# Python interpreter: Use venv if set, otherwise use system python3
 vars:
-  ansible_python_interpreter: "{{ lookup('env','VIRTUAL_ENV') + '/bin/python3' }}"
+  ansible_python_interpreter: "{{ (lookup('env','VIRTUAL_ENV') + '/bin/python3') if lookup('env','VIRTUAL_ENV', default='') != '' else '/usr/bin/python3' }}"
