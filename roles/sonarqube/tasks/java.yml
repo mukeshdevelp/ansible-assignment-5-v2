@@ -1,10 +1,11 @@
 ---
-- name: Wait for SSH to be ready
-  wait_for:
-    host: "{{ inventory_hostname }}"
-    port: 22
-    delay: 10
-    timeout: 300
+# SSH connectivity already verified by ansible ping test, skipping wait_for
+# - name: Wait for SSH to be ready
+#   wait_for:
+#     host: "{{ inventory_hostname }}"
+#     port: 22
+#     delay: 10
+#     timeout: 300
 
 # update caches for ubuntu and debian based systems
 - name: Update package cache on Debian/Ubuntu
