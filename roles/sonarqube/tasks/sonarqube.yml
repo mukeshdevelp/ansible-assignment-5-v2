@@ -180,7 +180,7 @@
   when: ansible_facts['os_family'] == "Debian"
 
 
-# 18. Start SonarQube service using systemd (proper service management)
+# 18. Start SonarQube service using systemd
 - name: Start and enable SonarQube service using systemd
   systemd:
     name: sonarqube
@@ -192,21 +192,6 @@
   delay: 10
   ignore_errors: yes
   ignore_unreachable: yes
-
-- name: Verify SonarQube process is running
-  shell: pgrep -f "sonarqube" || echo "not_running"
-  register: sonarqube_process_check
-  changed_when: false
-  failed_when: false
-  ignore_errors: yes
-
-- name: Display SonarQube start result
-  debug:
-    msg: |
-      SonarQube service status:
-      - Service started via systemd: Yes
-      - Process running: {{ 'Yes' if 'not_running' not in sonarqube_process_check.stdout else 'No' }}
-      - Process PID: {{ sonarqube_process_check.stdout if 'not_running' not in sonarqube_process_check.stdout else 'N/A' }}
 
 # 19. Wait for SonarQube to be listening on port 9000 (for ALB health checks)
 - name: Wait for SonarQube to be listening on port {{ sonarqube_port }}
