@@ -43,14 +43,17 @@
   package:
     name: unzip
     state: present
-  when: ansible_os_family in ['Debian', 'RedHat']
+  timeout: 300  # 5 minutes timeout
+  retries: 3
+  delay: 10
+  when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 
 # 4. Download SonarQube ZIP archive
 - name: Download SonarQube
   get_url:
     url: "{{ sonarqube_download_url }}"
     dest: "/tmp/sonarqube.zip"
-  when: ansible_os_family in ['Debian', 'RedHat']
+  when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 # 5. Create directories
 - name: Create SonarQube and temp directories
   file:
@@ -62,14 +65,14 @@
   loop:
     - /opt/sonarqube
     - /tmp/sonarqube_unzip
-  when: ansible_os_family in ['Debian', 'RedHat']
+  when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 # 6. Unzip to temp
 - name: Unzip SonarQube to temp directory
   unarchive:
     src: "/tmp/sonarqube.zip"
     dest: /tmp/sonarqube_unzip
     remote_src: true
-  when: ansible_os_family in ['Debian', 'RedHat']
+  when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 # 7. Find extracted top-level folder
 - name: Find top-level folder name
   ansible.builtin.find:
@@ -77,7 +80,7 @@
     file_type: directory
     depth: 1
   register: top_level_folder
-  when: ansible_os_family in ['Debian', 'RedHat']
+  when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 
 
 
@@ -87,7 +90,7 @@
   args:
     creates: /opt/sonarqube/bin
   loop: "{{ top_level_folder.files }}"
-  when: top_level_folder.matched == 1 and ansible_os_family in ['Debian', 'RedHat']
+  when: top_level_folder.matched == 1 and ansible_facts['os_family'] in ['Debian', 'RedHat']
   
 # 12. Remove temp unzip dir
 - name: Clean up temporary unzip directory
@@ -112,7 +115,8 @@
     mode: '0644'
   notify:
     - reload systemd
-  when: ansible_os_family == "RedHat"
+    - enable sonarqube
+  when: ansible_facts['os_family'] == "RedHat"
 # 14. Copy SonarQube service file
 - name: Copy SonarQube service file debian
   template:
@@ -121,7 +125,8 @@
     mode: '0644'
   notify:
     - reload systemd
-  when: ansible_os_family == "Debian"
+    - enable sonarqube
+  when: ansible_facts['os_family'] == "Debian"
 # 15. Configure sonar.properties
 - name: Configure SonarQube
   template:
@@ -130,12 +135,16 @@
     owner: "{{ sonarqube_user }}"
     group: "{{ sonarqube_group }}"
     mode: '0644'
+  notify: restart sonarqube
 
 # 15. Open firewall ports (RedHat)
 - name: Ensure firewalld is installed
   yum:
     name: firewalld
     state: present
+  timeout: 300  # 5 minutes timeout
+  retries: 3
+  delay: 10
   when: ansible_os_family == "RedHat"
 - name: Ensure firewalld is running and enabled
   systemd:
@@ -149,7 +158,7 @@
     permanent: yes
     state: enabled
     immediate: yes
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 
 # 16. Allow port on UFW (Debian)
@@ -157,47 +166,53 @@
   apt:
     name: ufw
     state: present
-  when: ansible_os_family == "Debian"
+  timeout: 300  # 5 minutes timeout
+  retries: 3
+  delay: 10
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Allow SonarQube port (Debian)
   community.general.ufw:
     rule: allow
     port: "{{ sonarqube_port }}"
     proto: tcp
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Enable UFW
   community.general.ufw:
     state: enabled
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
-# 17. Remove stale PID + temp
-- name: Remove stale PID and temp directory
+
+# 18. Start SonarQube service using systemd
+- name: Start and enable SonarQube service
+  systemd:
+    name: sonarqube
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  timeout: 120
+  retries: 2
+  delay: 10
+  ignore_errors: yes
+  ignore_unreachable: yes
+  vars:
+    ansible_connect_timeout: 60
+    ansible_timeout: 120
   
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /opt/sonarqube/bin/linux-x86-64/SonarQube.pid
-    - /opt/sonarqube/temp
-  
-  
-- name: start sonarqube
-  shell: |
-    su {{ sonarqube_user }} -c 'bash /opt/sonarqube/bin/linux-x86-64/sonar.sh start'
-    
-  register: sonarqube_status
-  
-- name: Check SonarQube status
-  shell: |
-    su {{ sonarqube_user }} -c 'bash /opt/sonarqube/bin/linux-x86-64/sonar.sh status'
-  register: sonarqube_status
+
+
+# 19. Check SonarQube status (non-blocking)
+- name: Check SonarQube service status
+  become: yes
+  command: systemctl is-active sonarqube
+  register: sonarqube_service_status
   changed_when: false
   failed_when: false
 
 - name: Display SonarQube status
   debug:
-    msg: "{{ sonarqube_status.stdout }}"
+    msg: "SonarQube service is {{ sonarqube_service_status.stdout | default('unknown') }}"
 
 
 
