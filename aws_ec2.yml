@@ -6,7 +6,7 @@ regions:
 
 filters:
   "tag:env": "sonarqube"
-  
+  instance-state-name: running
 
 hostnames:
   - private-ip-address
@@ -23,6 +23,7 @@ keyed_groups:
     separator: "_"
   - key: tags.Name
     prefix: ""
+    separator: "_"
 
 strict: False
 
