@@ -1,29 +1,17 @@
 ---
-
-
-# Test internet connectivity before apt update (using HTTP instead of ping)
-# Note: ICMP (ping) is often blocked by AWS/cloud providers, but HTTP works fine through NAT Gateway
-- name: Test internet connectivity via HTTP
-  uri:
-    url: http://archive.ubuntu.com
-    method: GET
-    status_code: [200, 301, 302, 303, 307, 308]
-    timeout: 10
-  register: connectivity_test
-  changed_when: false
-  failed_when: false
-  ignore_errors: yes
-
-- name: Display connectivity test result
-  debug:
-    msg: "Internet connectivity test: {{ 'PASSED' if connectivity_test.status in [200, 301, 302, 303, 307, 308] else 'FAILED - Check NAT Gateway' }}"
+- name: Wait for SSH to be ready
+  wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 22
+    delay: 10
+    timeout: 300
 
 # update caches for ubuntu and debian based systems
 - name: Update package cache on Debian/Ubuntu
   apt:
     update_cache: yes
-  timeout: 300  # 5 minutes timeout
   when: ansible_facts['os_family'] == "Debian"
+  
 # update caches for redhat based systems
 - name: Update package cache on RedHat/CentOS/RHEL
   yum:
@@ -35,7 +23,6 @@
   package:
     name: "{{ java_pkg }}"
     state: present
-  timeout: 600  # 10 minutes timeout for package installation
 
 - name: Get Java version
   command: java -version
