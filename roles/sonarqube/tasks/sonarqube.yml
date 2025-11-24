@@ -107,25 +107,22 @@
     recurse: yes
   become: true
 
-# 14. Copy SonarQube service file
-- name: Copy SonarQube service file
+# 14. Copy SonarQube service file for systemd management
+- name: Copy SonarQube service file (RedHat)
   template:
     src: sonarqube_rh.service.j2
     dest: /etc/systemd/system/sonarqube.service
     mode: '0644'
   notify:
     - reload systemd
-    - enable sonarqube
   when: ansible_facts['os_family'] == "RedHat"
-# 14. Copy SonarQube service file
-- name: Copy SonarQube service file debian
+- name: Copy SonarQube service file (Debian)
   template:
     src: sonarqube_db.service.j2
     dest: /etc/systemd/system/sonarqube.service
     mode: '0644'
   notify:
     - reload systemd
-    - enable sonarqube
   when: ansible_facts['os_family'] == "Debian"
 # 15. Configure sonar.properties
 - name: Configure SonarQube
@@ -135,7 +132,6 @@
     owner: "{{ sonarqube_user }}"
     group: "{{ sonarqube_group }}"
     mode: '0644'
-  notify: restart sonarqube
 
 # 15. Open firewall ports (RedHat)
 - name: Ensure firewalld is installed
@@ -184,25 +180,47 @@
   when: ansible_facts['os_family'] == "Debian"
 
 
-# 18. Start SonarQube service using systemd
-- name: Start and enable SonarQube service
+# 18. Start SonarQube service using systemd (proper service management)
+- name: Start and enable SonarQube service using systemd
   systemd:
     name: sonarqube
     state: started
     enabled: yes
     daemon_reload: yes
-  timeout: 120
+  timeout: 300
   retries: 2
   delay: 10
   ignore_errors: yes
   ignore_unreachable: yes
-  vars:
-    ansible_connect_timeout: 60
-    ansible_timeout: 120
-  
 
+- name: Verify SonarQube process is running
+  shell: pgrep -f "sonarqube" || echo "not_running"
+  register: sonarqube_process_check
+  changed_when: false
+  failed_when: false
+  ignore_errors: yes
 
-# 19. Check SonarQube status (non-blocking)
+- name: Display SonarQube start result
+  debug:
+    msg: |
+      SonarQube service status:
+      - Service started via systemd: Yes
+      - Process running: {{ 'Yes' if 'not_running' not in sonarqube_process_check.stdout else 'No' }}
+      - Process PID: {{ sonarqube_process_check.stdout if 'not_running' not in sonarqube_process_check.stdout else 'N/A' }}
+
+# 19. Wait for SonarQube to be listening on port 9000 (for ALB health checks)
+- name: Wait for SonarQube to be listening on port {{ sonarqube_port }}
+  wait_for:
+    port: "{{ sonarqube_port }}"
+    host: "{{ inventory_hostname }}"
+    delay: 10
+    timeout: 600  # Wait up to 10 minutes for SonarQube to start
+    state: started
+  delegate_to: localhost  # Run this task from the Ansible controller (bastion)
+  become: false  # No sudo needed for wait_for
+  when: inventory_hostname in groups['_sonarqube']  # Only run for SonarQube instances
+
+# 20. Check SonarQube service status (non-blocking)
 - name: Check SonarQube service status
   become: yes
   command: systemctl is-active sonarqube
