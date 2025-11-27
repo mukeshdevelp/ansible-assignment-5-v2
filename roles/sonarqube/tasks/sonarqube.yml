@@ -193,17 +193,8 @@
   ignore_errors: yes
   ignore_unreachable: yes
 
-# 19. Wait for SonarQube to be listening on port 9000 (for ALB health checks)
-- name: Wait for SonarQube to be listening on port {{ sonarqube_port }}
-  wait_for:
-    port: "{{ sonarqube_port }}"
-    host: "{{ inventory_hostname }}"
-    delay: 10
-    timeout: 600  # Wait up to 10 minutes for SonarQube to start
-    state: started
-  delegate_to: localhost  # Run this task from the Ansible controller (bastion)
-  become: false  # No sudo needed for wait_for
-  when: inventory_hostname in groups['_sonarqube']  # Only run for SonarQube instances
+
+
 
 # 20. Check SonarQube service status (non-blocking)
 - name: Check SonarQube service status
